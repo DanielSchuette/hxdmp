@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::io;
 use std::io::prelude::*;
 use std::process::exit;
 use std::str::from_utf8;
@@ -7,20 +8,37 @@ use std::str::from_utf8;
 const COLS: usize = 16;
 
 fn main() {
+    let mut buf: [u8; COLS] = [0; COLS];
+    let mut byte_counter = 0;
+
+    // get the file path
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         println!("usage: {} <FILE>", args[0]);
         exit(0);
     }
     let path = args.get(1).unwrap();
-    let mut file = fs::File::open(path).expect(&format!("Failed to open {}", path));
-    let mut buf: [u8; COLS] = [0; COLS];
-    let mut byte_counter = 0;
-    let mut read;
 
+    // check if file exists
+    let mut file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(err) => {
+            let msg = get_err(err, "cannot open file", &path);
+            println!("{}: {}.", args[0], msg);
+            exit(1);
+        }
+    };
+
+    // read `COLS' bytes at a time and print them like `hexdump -C'
     loop {
-        read = file.read(&mut buf)
-                   .expect(&format!("Failed to read from {}", path));
+        let read = match file.read(&mut buf) {
+            Ok(r) => r,
+            Err(err) => {
+                let msg = get_err(err, "cannot read file", &path);
+                println!("{}: {}.", args[0], msg);
+                exit(1);
+            }
+        };
         print!("{:08x}", byte_counter);
         if !(read > 0) {
             break;
@@ -62,4 +80,10 @@ fn main() {
         print!("|\n");
     }
     print!("\n");
+}
+
+fn get_err(err: io::Error, msg: &str, path: &String) -> String {
+    let err = format!("error: {} {}, {}", msg, path, err);
+    let (err, _) = err.split_at(err.find('(').unwrap() - 1);
+    err.to_string().to_lowercase()
 }
