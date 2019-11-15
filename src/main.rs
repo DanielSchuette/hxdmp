@@ -3,7 +3,6 @@ use std::fs;
 use std::io;
 use std::io::prelude::*;
 use std::process::exit;
-use std::str::from_utf8;
 
 const COLS: usize = 16;
 
@@ -39,7 +38,8 @@ fn main() {
                 exit(1);
             }
         };
-        print!("{:08x}", byte_counter);
+
+        savely_write_stdout(format!("{:08x}", byte_counter));
         if !(read > 0) {
             break;
         } else {
@@ -57,7 +57,7 @@ fn main() {
                 }
                 break;
             }
-            print!("{:02x}", byte);
+            savely_write_stdout(format!("{:02x}", byte));
             byte_counter += 1;
             if byte_counter % (COLS / 2) == 0 {
                 print!("  ");
@@ -66,15 +66,13 @@ fn main() {
             }
         }
         print!("|");
-        for (idx, c) in from_utf8(&buf).expect("Invalid string").chars().enumerate()
-        {
-            if (idx + 1) > read {
-                break;
-            }
-            if c == '\n' || c == '\t' || c == '\r' {
-                print!(".");
+
+        // print any ASCII characters or just '.'
+        for byte in buf.iter() {
+            if *byte >= 32 && *byte <= 126 {
+                print!("{}", *byte as char);
             } else {
-                print!("{}", c);
+                print!(".");
             }
         }
         print!("|\n");
@@ -86,4 +84,10 @@ fn get_err(err: io::Error, msg: &str, path: &String) -> String {
     let err = format!("error: {} {}, {}", msg, path, err);
     let (err, _) = err.split_at(err.find('(').unwrap() - 1);
     err.to_string().to_lowercase()
+}
+
+fn savely_write_stdout(string: String) {
+    if io::stdout().write_all(string.as_bytes()).is_err() {
+        exit(141); // bad pipe
+    }
 }
